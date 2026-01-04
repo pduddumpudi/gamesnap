@@ -97,7 +97,7 @@ export default function ExportPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Export Your Game</h1>
             <p className="text-gray-600 mt-2">
-              Choose how you'd like to export your game
+              Choose how you&apos;d like to export your game
             </p>
           </div>
 
