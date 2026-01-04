@@ -16,20 +16,20 @@ export default function ReviewPage() {
   const [originalImage, setOriginalImage] = useState<string>('');
 
   useEffect(() => {
-    // Get images from URL params or localStorage
-    const processImages = async () => {
-      // TODO: Get images from previous page
-      // For now, use mock data
-      setTimeout(() => {
-        setMoves([
-          { move_number: 1, white: 'e4', black: 'e5', confidence: { white: 0.95, black: 0.92 } },
-          { move_number: 2, white: 'Nf3', black: 'Nc6', confidence: { white: 0.88, black: 0.85 } },
-        ]);
-        setIsProcessing(false);
-      }, 1000);
-    };
-
-    processImages();
+    // Get game data from localStorage
+    const gameDataJson = localStorage.getItem('gamesnap_current_game');
+    if (gameDataJson) {
+      try {
+        const gameData = JSON.parse(gameDataJson);
+        setMoves(gameData.moves || []);
+        if (gameData.images && gameData.images.length > 0) {
+          setOriginalImage(gameData.images[0]);
+        }
+      } catch (error) {
+        console.error('Error loading game data:', error);
+      }
+    }
+    setIsProcessing(false);
   }, []);
 
   const handleMoveClick = (index: number) => {
@@ -121,10 +121,7 @@ export default function ReviewPage() {
             </button>
 
             <button
-              onClick={() => {
-                // TODO: Navigate to export page
-                console.log('Export PGN');
-              }}
+              onClick={() => window.location.href = '/export'}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               Export PGN →

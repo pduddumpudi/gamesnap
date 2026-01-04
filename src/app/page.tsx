@@ -1,14 +1,55 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import CameraCapture from '@/components/CameraCapture';
 import Header from '@/components/Header';
+import { stitchPages } from '@/lib/chess-parser';
 
 export default function Home() {
+  const router = useRouter();
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleImageCapture = (imageDataUrl: string) => {
     setCapturedImages((prev) => [...prev, imageDataUrl]);
+  };
+
+  const handleProcessImages = async () => {
+    if (capturedImages.length === 0) return;
+
+    setIsProcessing(true);
+
+    try {
+      // Call OCR API for each image
+      const ocrPromises = capturedImages.map((image, index) =>
+        fetch('/api/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image, page_number: index + 1 }),
+        }).then((res) => res.json())
+      );
+
+      const ocrResults = await Promise.all(ocrPromises);
+
+      // Stitch multi-page results
+      const stitched = stitchPages(ocrResults);
+
+      // Store in localStorage for review page
+      localStorage.setItem('gamesnap_current_game', JSON.stringify({
+        moves: stitched.moves,
+        metadata: stitched.metadata,
+        images: capturedImages,
+      }));
+
+      // Navigate to review page
+      router.push('/review');
+    } catch (error) {
+      console.error('Error processing images:', error);
+      alert('Hmm, something went wrong processing your scoresheet. Please try again!');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -47,13 +88,18 @@ export default function Home() {
 
             <div className="mt-6 flex justify-center">
               <button
-                onClick={() => {
-                  // TODO: Navigate to review page with images
-                  console.log('Processing images:', capturedImages);
-                }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                onClick={handleProcessImages}
+                disabled={isProcessing}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Process Scoresheets →
+                {isProcessing ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                    Processing...
+                  </span>
+                ) : (
+                  'Process Scoresheets →'
+                )}
               </button>
             </div>
           </div>
