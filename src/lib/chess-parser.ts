@@ -26,7 +26,7 @@ export const parseScoresheet = (rawText: string): ParsedScoresheet => {
   result.black_player = black_player;
 
   // Parse moves
-  result.moves = extractMoves(cleanedLines);
+  result.moves = extractMovesFromText(rawText, cleanedLines);
 
   // Try to extract result
   result.result = extractResult(rawText);
@@ -60,7 +60,16 @@ const extractPlayerNames = (lines: string[]): {
   return { white_player, black_player, cleanedLines };
 };
 
-const extractMoves = (lines: string[]): Move[] => {
+const extractMovesFromText = (rawText: string, lines: string[]): Move[] => {
+  const tokenMoves = extractMovesFromTokens(rawText);
+  if (tokenMoves.length > 0) {
+    return tokenMoves;
+  }
+
+  return extractMovesFromLines(lines);
+};
+
+const extractMovesFromLines = (lines: string[]): Move[] => {
   const moves: Move[] = [];
 
   for (const line of lines) {
@@ -92,16 +101,114 @@ const extractMoves = (lines: string[]): Move[] => {
   return moves;
 };
 
+const extractMovesFromTokens = (rawText: string): Move[] => {
+  const moves: Move[] = [];
+  const tokens = tokenizeMoves(rawText);
+
+  let currentMoveNumber: number | null = null;
+  let pendingMove: Move | null = null;
+
+  for (const token of tokens) {
+    const splitToken = splitMoveNumberToken(token);
+    if (splitToken) {
+      if (pendingMove) {
+        moves.push(pendingMove);
+        pendingMove = null;
+      }
+      currentMoveNumber = splitToken.moveNumber;
+      if (isLikelyMove(splitToken.move)) {
+        pendingMove = createMove(currentMoveNumber, cleanMove(splitToken.move));
+      }
+      continue;
+    }
+
+    const moveNumber = parseMoveNumberToken(token);
+    if (moveNumber !== null) {
+      if (pendingMove) {
+        moves.push(pendingMove);
+        pendingMove = null;
+      }
+      currentMoveNumber = moveNumber;
+      continue;
+    }
+
+    if (!isLikelyMove(token)) {
+      continue;
+    }
+
+    const normalized = cleanMove(token);
+    if (currentMoveNumber === null) {
+      continue;
+    }
+
+    if (!pendingMove) {
+      pendingMove = createMove(currentMoveNumber, normalized);
+      continue;
+    }
+
+    if (!pendingMove.black) {
+      pendingMove.black = normalized;
+      continue;
+    }
+
+    moves.push(pendingMove);
+    pendingMove = createMove(currentMoveNumber + 1, normalized);
+    currentMoveNumber += 1;
+  }
+
+  if (pendingMove) {
+    moves.push(pendingMove);
+  }
+
+  return moves;
+};
+
+const tokenizeMoves = (rawText: string): string[] => {
+  return rawText
+    .replace(/\|/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+};
+
+const parseMoveNumberToken = (token: string): number | null => {
+  const match = token.match(/^(\d+)[\.\)]?$/);
+  if (!match) return null;
+  return parseInt(match[1], 10);
+};
+
+const splitMoveNumberToken = (token: string): { moveNumber: number; move: string } | null => {
+  const match = token.match(/^(\d+)[\.\)]?([A-Za-zO0].+)$/);
+  if (!match) return null;
+  return {
+    moveNumber: parseInt(match[1], 10),
+    move: match[2],
+  };
+};
+
+const isLikelyMove = (token: string): boolean => {
+  const normalized = normalizeMoveToken(token);
+  return /^O-O(-O)?[\+\#]?$/.test(normalized) ||
+    /^[KQRBN]?[a-h]?[1-8]?[x]?[a-h][1-8](=[QRBN])?[\+\#]?$/.test(normalized);
+};
+
+const createMove = (moveNumber: number, white: string): Move => ({
+  move_number: moveNumber,
+  white,
+  black: '',
+  confidence: {
+    white: 0.8,
+    black: 1.0,
+  },
+});
+
 const cleanMove = (move: string): string => {
   if (!move) return '';
 
   // Remove common OCR errors and normalize
-  let cleaned = move.trim();
+  let cleaned = normalizeMoveToken(move.trim());
 
   // Convert 0-0 (zeros) to O-O (letters) for castling
-  cleaned = cleaned.replace(/0-0-0/g, 'O-O-O');
-  cleaned = cleaned.replace(/0-0/g, 'O-O');
-
   // Remove spaces within moves
   cleaned = cleaned.replace(/\s/g, '');
 
@@ -112,6 +219,14 @@ const cleanMove = (move: string): string => {
   }
 
   return cleaned;
+};
+
+const normalizeMoveToken = (token: string): string => {
+  let normalized = token.replace(/0-0-0/gi, 'O-O-O').replace(/0-0/gi, 'O-O');
+  if (/^[kqrbn]/.test(normalized)) {
+    normalized = normalized[0].toUpperCase() + normalized.slice(1);
+  }
+  return normalized;
 };
 
 const extractResult = (rawText: string): string | undefined => {
