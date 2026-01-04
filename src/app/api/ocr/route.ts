@@ -162,8 +162,8 @@ async function runOpenAiOcr(base64Image: string, apiKey: string, model: string):
       },
       raw_text: parsedText,
       low_confidence_indices: mergedMoves
-        .map((move, index) => (move.white ? -1 : index))
-        .filter((i) => i !== -1),
+        .map((move: { white: string }, index: number) => (move.white ? -1 : index))
+        .filter((i: number) => i !== -1),
     };
   } catch (error) {
     console.warn('OpenAI OCR exception:', error);
