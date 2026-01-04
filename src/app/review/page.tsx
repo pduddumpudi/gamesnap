@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import MoveList from '@/components/MoveList';
 import ChessBoard from '@/components/ChessBoard';
 import { Move, ValidationError } from '@/types';
 
 export default function ReviewPage() {
-  const searchParams = useSearchParams();
   const [moves, setMoves] = useState<Move[]>([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(0);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
