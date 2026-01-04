@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import CameraCapture from '@/components/CameraCapture';
 import Header from '@/components/Header';
 import { stitchPages } from '@/lib/chess-parser';
+import { GameMetadata, OCRResponse } from '@/types';
+
+const normalizeResult = (result?: string): GameMetadata['result'] => {
+  if (result === '1-0' || result === '0-1' || result === '1/2-1/2' || result === '*') {
+    return result;
+  }
+  return undefined;
+};
 
 export default function Home() {
   const router = useRouter();
@@ -30,15 +38,25 @@ export default function Home() {
         }).then((res) => res.json())
       );
 
-      const ocrResults = await Promise.all(ocrPromises);
+      const ocrResults = await Promise.all(ocrPromises) as OCRResponse[];
 
-      // Stitch multi-page results
-      const stitched = stitchPages(ocrResults);
+      // Stitch multi-page results (normalize OCR metadata into parser shape)
+      const stitched = stitchPages(ocrResults.map((page) => ({
+        moves: page.moves,
+        white_player: page.metadata?.white_player,
+        black_player: page.metadata?.black_player,
+        result: page.metadata?.result,
+      })));
 
       // Store in localStorage for review page
+      const metadata: GameMetadata = {
+        white_player: stitched.white_player,
+        black_player: stitched.black_player,
+        result: normalizeResult(stitched.result),
+      };
       localStorage.setItem('gamesnap_current_game', JSON.stringify({
         moves: stitched.moves,
-        metadata: stitched.metadata,
+        metadata,
         images: capturedImages,
       }));
 

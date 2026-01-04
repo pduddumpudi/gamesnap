@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { generatePGN } from '@/lib/pgn';
 import { Move, GameMetadata } from '@/types';
 
 export default function ExportPage() {
-  const searchParams = useSearchParams();
   const [pgn, setPgn] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
